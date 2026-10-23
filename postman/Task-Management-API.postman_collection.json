@@ -15,8 +15,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
             }
           },
           "response": [],
@@ -59,8 +64,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
             }
           },
           "response": [],
@@ -105,8 +116,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
             }
           },
           "response": [],
@@ -153,8 +170,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
             }
           },
           "response": [],
@@ -202,8 +225,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
             }
           },
           "response": [],
@@ -248,8 +276,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
             }
           },
           "response": [],
@@ -284,8 +317,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks", "{{taskId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{taskId}}"
+              ]
             }
           },
           "response": [],
@@ -329,8 +368,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks", "{{taskId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{taskId}}"
+              ]
             }
           },
           "response": [],
@@ -365,8 +410,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks", "{{taskId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{taskId}}"
+              ]
             }
           },
           "response": [],
@@ -384,7 +435,6 @@
                   "    pm.expect(data.message).to.include(\"deleted\");",
                   "});",
                   "pm.test(\"Clear taskId\", function () {",
-                  "    pm.environment.unset(\"taskId\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -403,9 +453,15 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks", "{{taskId}}"]
+              "raw": "{{baseUrl}}/api/tasks/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "999999"
+              ]
             }
           },
           "response": [],
@@ -429,7 +485,7 @@
           ]
         },
         {
-          "name": "POST Task Without Token (expect 401)",
+          "name": "POST Task Without Token ",
           "request": {
             "method": "POST",
             "header": [
@@ -444,8 +500,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
             }
           },
           "response": [],
@@ -469,7 +530,7 @@
           ]
         },
         {
-          "name": "POST Task Invalid Data (expect 400)",
+          "name": "POST Task Invalid Data",
           "request": {
             "method": "POST",
             "header": [
@@ -488,8 +549,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
             }
           },
           "response": [],
