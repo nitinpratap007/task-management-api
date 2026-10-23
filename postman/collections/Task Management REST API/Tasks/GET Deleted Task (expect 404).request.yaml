@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/api/tasks/999999"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 404", function () {
+          pm.response.to.have.status(404);
+      });
+      pm.test("Task not found message", function () {
+          var data = pm.response.json();
+          pm.expect(data.success).to.eql(false);
+          pm.expect(data.message).to.include("not found");
+      });
+    language: text/javascript
+order: 6000

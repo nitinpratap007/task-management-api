@@ -1,0 +1,12 @@
+$kind: collection
+description: |-
+  Postman collection for the Task Management REST API (Node.js + Express + SQLite + JWT).
+
+  Test sequence: Health → Register → Login → Create Task → Get All → Get One → Update → Delete.
+
+  Set these environment variables:
+  - baseUrl: e.g. http://localhost:3000
+  - token: set automatically after Login
+  - taskId: set automatically after Create Task
+
+  Never store real passwords, secrets, or production tokens here.

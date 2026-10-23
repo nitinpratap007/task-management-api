@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{baseUrl}}/api/tasks/{{taskId}}"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Returns single task", function () {
+          var data = pm.response.json();
+          pm.expect(data.success).to.eql(true);
+          pm.expect(data.task).to.not.be.undefined;
+          pm.expect(data.task.id).to.eql(parseInt(pm.environment.get("taskId")));
+      });
+    language: text/javascript
+order: 3000

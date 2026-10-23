@@ -1,0 +1,33 @@
+$kind: http-request
+url: "{{baseUrl}}/api/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "testuser@example.com",
+      "password": "TestPass123"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Login returns a usable JWT", function () {
+          var data = pm.response.json();
+          pm.expect(data.success).to.eql(true);
+          pm.expect(data.data.token).to.not.be.undefined;
+          pm.expect(data.data.user.password_hash).to.be.undefined;
+      });
+      pm.test("Save token to environment", function () {
+          var data = pm.response.json();
+          if (data.data && data.data.token) {
+              pm.environment.set("token", data.data.token);
+              console.log("Token saved:", data.data.token);
+          }
+      });
+    language: text/javascript
+order: 2000

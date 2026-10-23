@@ -1,0 +1,11 @@
+name: TaskAPI Local
+values:
+  - key: baseUrl
+    value: ''
+    description: 'http://localhost:3000'
+  - key: token
+    value: ''
+  - key: taskID
+    value: ''
+  - key: taskId
+    value: ''

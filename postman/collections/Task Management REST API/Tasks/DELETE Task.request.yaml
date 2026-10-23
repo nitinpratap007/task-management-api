@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/api/tasks/{{taskId}}"
+method: DELETE
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Task deleted", function () {
+          var data = pm.response.json();
+          pm.expect(data.success).to.eql(true);
+          pm.expect(data.message).to.include("deleted");
+      });
+      pm.test("Clear taskId", function () {
+      });
+    language: text/javascript
+order: 5000

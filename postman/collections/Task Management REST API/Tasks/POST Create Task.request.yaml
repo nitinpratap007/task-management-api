@@ -1,0 +1,37 @@
+$kind: http-request
+url: "{{baseUrl}}/api/tasks"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "title": "Learn Postman",
+      "description": "Create and run API tests",
+      "completed": false
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      pm.test("Task created with id and title", function () {
+          var data = pm.response.json();
+          pm.expect(data.success).to.eql(true);
+          pm.expect(data.data.task).to.not.be.undefined;
+          pm.expect(data.data.task.id).to.not.be.undefined;
+          pm.expect(data.data.task.title).to.eql("Learn Postman");
+          pm.expect(data.data.task.completed).to.eql(false);
+      });
+      pm.test("Save taskId to environment", function () {
+          var data = pm.response.json();
+          if (data.data && data.data.task && data.data.task.id) {
+              pm.environment.set("taskId", data.data.task.id);
+              console.log("taskId saved:", data.data.task.id);
+          }
+      });
+    language: text/javascript
+order: 1000
