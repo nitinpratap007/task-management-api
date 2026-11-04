@@ -6,7 +6,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
-// Helper: generate a signed JWT for a user ID
 const generateToken = (userId) => {
   return jwt.sign(
     { userId: userId },
@@ -20,35 +19,36 @@ const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // Prevent duplicate accounts (application-level check)
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (existingUser) {
+    // Check if email already exists
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
       return res.status(409).json({
         success: false,
         message: 'Email already registered'
       });
     }
 
-    // Hash the password with bcrypt before storing
+    // Hash password
     const salt = bcrypt.genSaltSync(12);
     const hashedPassword = bcrypt.hashSync(password, salt);
 
-    // Insert user into the database (email normalized to lowercase)
-    const result = db.prepare(
-      'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)'
-    ).run(name, email.toLowerCase(), hashedPassword);
+    // Insert user
+    const result = await db.query(
+      'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email',
+      [name, email.toLowerCase(), hashedPassword]
+    );
 
-    const userId = result.lastInsertRowid;
-    const token = generateToken(userId);
+    const user = result.rows[0];
+    const token = generateToken(user.id);
 
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
         user: {
-          id: Number(userId),
-          name: name,
-          email: email.toLowerCase()
+          id: user.id,
+          name: user.name,
+          email: user.email
         },
         token: token
       }
@@ -67,17 +67,16 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Look up user by email (normalized to lowercase)
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
 
-    if (!user) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    // Compare supplied password with stored hash
+    const user = result.rows[0];
     const isPasswordValid = bcrypt.compareSync(password, user.password_hash);
 
     if (!isPasswordValid) {

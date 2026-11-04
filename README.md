@@ -1,17 +1,16 @@
 # Task Management REST API
 
-A complete, functional REST API for personal task management with JWT authentication, built with Node.js, Express, and SQLite.
+A complete, functional REST API for personal task management with JWT authentication, built with Node.js, Express, and PostgreSQL.
 
 ## Tech Stack
 
 - **Runtime:** Node.js (CommonJS)
 - **Framework:** Express.js
-- **Database:** SQLite (`better-sqlite3`) — file-based, zero configuration
+- **Database:** PostgreSQL (via `pg`)
 - **Authentication:** JWT (`jsonwebtoken`)
 - **Password Hashing:** `bcryptjs`
 - **Input Validation:** `express-validator`
 - **Environment:** `dotenv`
-- **Dev:** `nodemon`
 
 ## Features
 
@@ -22,13 +21,16 @@ A complete, functional REST API for personal task management with JWT authentica
 - Per-user task ownership — users can only access their own tasks
 - Input validation with clear error messages
 - Consistent HTTP status codes (200, 201, 400, 401, 404, 409, 500)
-- Persistent SQLite database (survives server restarts)
+- Persistent PostgreSQL database (survives server restarts)
 - Centralized error handling and 404 handling
+- Configurable CORS
+- Security headers
 
 ## Prerequisites
 
 - Node.js (v18 or higher recommended)
 - npm
+- PostgreSQL database (local or hosted, e.g., Neon, Supabase, Railway, Render)
 
 ## Installation
 
@@ -41,7 +43,7 @@ copy .env.example .env   (Windows)
 # or
 cp .env.example .env     (macOS/Linux)
 
-# 3. Edit .env and set a strong JWT_SECRET (minimum 32 characters)
+# 3. Edit .env and set DATABASE_URL and JWT_SECRET
 ```
 
 ## Environment Setup
@@ -52,17 +54,16 @@ Create a `.env` file in the project root:
 PORT=3000
 JWT_SECRET=your_random_secret_minimum_32_characters
 JWT_EXPIRES_IN=24h
-# Optional: comma-separated list of allowed CORS origins (e.g. http://localhost:5173)
+DATABASE_URL=postgresql://username:password@host/dbname?sslmode=require
+# Optional: comma-separated list of allowed CORS origins
 # ALLOWED_ORIGINS=http://localhost:5173
-# Optional: custom SQLite database file path (defaults to data/app.db)
-# DB_PATH=data/app.db
 ```
 
 - `PORT` — port the server listens on (default 3000)
-- `JWT_SECRET` — secret key used to sign and verify JWT tokens. **Never share this.** Generate a strong random string (32+ characters).
+- `JWT_SECRET` — secret key for JWT tokens. **Never share this.**
 - `JWT_EXPIRES_IN` — token expiration (e.g. `24h`)
-
-`.env` is excluded from version control via `.gitignore`. Only `.env.example` (with placeholders) is committed.
+- `DATABASE_URL` — PostgreSQL connection string
+- `ALLOWED_ORIGINS` — comma-separated CORS origins (optional in dev)
 
 ## How to Start
 
@@ -70,11 +71,19 @@ JWT_EXPIRES_IN=24h
 # Production mode
 npm start
 
-# Development mode (auto-restart on file changes)
+# Development mode (auto-restart)
 npm run dev
 ```
 
 The server runs at `http://localhost:3000`.
+
+## Database Setup
+
+The database tables are created automatically on first startup. No manual migration needed.
+
+Tables:
+- `users` (id, name, email, password_hash, created_at)
+- `tasks` (id, user_id, title, description, completed, created_at, updated_at)
 
 ## API Endpoints
 
@@ -159,7 +168,7 @@ Response (201): created task object.
 GET /api/tasks
 Authorization: Bearer <token>
 ```
-Response (200): `{ "count": N, "tasks": [ ... ] }` — only the authenticated user's tasks.
+Response (200): `{ "count": N, "tasks": [ ... ] }`
 
 ### Get Single Task
 ```http
@@ -187,114 +196,53 @@ Authorization: Bearer <token>
 ```
 Response (200): `{ "success": true, "message": "Task deleted successfully" }`.
 
-### Health Check
-```http
-GET /api/health
-```
-Response (200): `{ "status": "ok", "timestamp": "..." }`
-
-## Status Codes
-
-| Code | Meaning |
-|------|---------|
-| 200 | Success |
-| 201 | Created successfully |
-| 400 | Bad request / validation error |
-| 401 | Unauthorized (missing, invalid, or expired token) |
-| 404 | Not found |
-| 409 | Conflict (duplicate email on register) |
-| 500 | Internal server error |
-
-## JWT Authentication
-
-1. Register or log in via `/api/auth/register` or `/api/auth/login`.
-2. Copy the `token` from the response.
-3. Include it in every protected request header: `Authorization: Bearer <token>`.
-4. Tokens expire after `JWT_EXPIRES_IN` (default 24h). Log in again to get a new token.
-
-## Postman Setup
-
-A Postman collection is included at `postman/Task-Management-API.postman_collection.json`.
-
-1. Import the collection into Postman.
-2. Create a Postman environment with variables:
-   - `baseUrl` — e.g. `http://localhost:3000`
-   - `token` — set after login
-   - `taskId` — set after creating a task
-3. Run requests in sequence: Health → Register → Login → Create Task → List/Get/Update/Delete Task.
-4. Use the "Tests" tab in each request to assert status codes and save `token`/`taskId` as environment variables.
-
-## Database Location & Persistence
-
-- Database file: `data/app.db`
-- Tables: `users` and `tasks`
-- The database is **never** deleted or reset on server startup — data persists across restarts.
-- Passwords are stored only as bcrypt hashes.
-- `data/` is excluded from version control via `.gitignore`.
-
 ## Automated Tests
-
-A real automated test suite is included at `test/api.test.js` (44 tests). It uses Node's built-in `http` module and an isolated test database (`data/test.db`) so real user data is never touched.
-
-Run:
 
 ```bash
 npm test
 ```
 
-The suite verifies:
-- Health endpoint
-- Valid/invalid registration, duplicate email rejection
-- Password stored as bcrypt hash (not plaintext)
-- Valid/invalid login, JWT issuance
-- Missing/invalid/expired token rejection on protected routes
-- Full task CRUD (create, list, get, update, delete)
-- Invalid task data rejection
-- Nonexistent task handling (404)
-- Cross-user access prevention (User A cannot read/update/delete User B's task)
-- Task persistence across server restarts
-- Malformed request handling without crashing
+## Deploy to Render
 
-Expected output: `Total: 44 | Passed: 44 | Failed: 0`
+### Step 1: Create Render Account
+1. Go to https://render.com
+2. Sign up (GitHub login recommended)
 
-## Project Structure
+### Step 2: Create Web Service
+1. Dashboard → **New** → **Web Service**
+2. Connect your GitHub repo: `task-management-api`
+3. Configure:
+   - **Name:** `task-management-api`
+   - **Environment:** `Node`
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+   - **Plan:** Free
 
-```
-├── server.js              # Entry point
-├── .env                   # Local environment (gitignored)
-├── .env.example           # Environment template
-├── .gitignore             # Git ignore rules
-├── package.json
-├── package-lock.json
-├── config/
-│   └── db.js              # SQLite setup + tables
-├── controllers/
-│   ├── authController.js  # Register & Login
-│   └── taskController.js  # Task CRUD
-├── middleware/
-│   └── auth.js            # JWT verification
-├── routes/
-│   ├── authRoutes.js      # Auth endpoints
-│   └── taskRoutes.js      # Task endpoints
-├── validators/
-│   └── validators.js      # Input validation rules
-├── data/
-│   └── app.db             # SQLite database (gitignored)
-├── postman/
-│   └── Task-Management-API.postman_collection.json
-└── README.md
-```
+### Step 3: Set Environment Variables
+In Render dashboard → Environment:
+| Key | Value |
+|-----|-------|
+| `PORT` | `10000` (Render sets this automatically, but you can override) |
+| `JWT_SECRET` | Your strong secret (generate one) |
+| `JWT_EXPIRES_IN` | `24h` |
+| `DATABASE_URL` | Your Neon PostgreSQL connection string |
+| `ALLOWED_ORIGINS` | Your Vercel frontend URL (e.g., `https://your-app.vercel.app`) |
+
+### Step 4: Deploy
+Click **Create Web Service**. Render will build and deploy.
+
+Your backend URL will be: `https://task-management-api.onrender.com`
+
+### Step 5: Verify
+Open: `https://task-management-api.onrender.com/api/health`
+Expected: `{"status":"ok","timestamp":"..."}`
 
 ## Security Limitations & Future Improvements
 
-This project implements practical security measures (bcrypt hashing, JWT expiration, parameterized queries, per-user ownership, env-based secrets), but it is **not** production-secure as-is. Known limitations:
-
-- No rate limiting on auth endpoints (brute-force login/register possible)
+- No rate limiting on auth endpoints
 - No refresh token mechanism
-- No password complexity requirements beyond length
 - No email verification
-- `better-sqlite3` is synchronous; suitable for low-to-moderate concurrency
-- No HTTPS (use a reverse proxy / TLS in production)
-- CORS not configured — configure `cors` with allowed origins for production
+- No HTTPS configuration (handled by Render)
+- CORS configured via ALLOWED_ORIGINS env var
 
 Do not commit `.env`, `node_modules/`, or `data/` to Git.

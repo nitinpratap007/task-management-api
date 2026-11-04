@@ -5,32 +5,30 @@
 
 const db = require('../config/db');
 
-// Helper: convert a SQLite task row into a clean JSON-friendly object
 const formatTask = (task) => ({
   id: task.id,
   userId: task.user_id,
   title: task.title,
   description: task.description,
-  completed: task.completed === 1,
+  completed: task.completed === true,
   createdAt: task.created_at,
   updatedAt: task.updated_at
 });
 
 // POST /api/tasks
-const createTask = (req, res) => {
+const createTask = async (req, res) => {
   try {
     const { title, description = '', completed = false } = req.body;
 
-    const result = db.prepare(
-      'INSERT INTO tasks (user_id, title, description, completed) VALUES (?, ?, ?, ?)'
-    ).run(req.user.id, title, description, completed ? 1 : 0);
-
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
+    const result = await db.query(
+      'INSERT INTO tasks (user_id, title, description, completed) VALUES ($1, $2, $3, $4) RETURNING *',
+      [req.user.id, title, description, completed]
+    );
 
     res.status(201).json({
       success: true,
       message: 'Task created successfully',
-      data: { task: formatTask(task) }
+      data: { task: formatTask(result.rows[0]) }
     });
   } catch (error) {
     console.error('Create task error:', error.message);
@@ -39,17 +37,18 @@ const createTask = (req, res) => {
 };
 
 // GET /api/tasks
-const getAllTasks = (req, res) => {
+const getAllTasks = async (req, res) => {
   try {
-    const tasks = db.prepare(
-      'SELECT * FROM tasks WHERE user_id = ? ORDER BY created_at DESC'
-    ).all(req.user.id);
+    const result = await db.query(
+      'SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
 
     res.status(200).json({
       success: true,
       data: {
-        count: tasks.length,
-        tasks: tasks.map(formatTask)
+        count: result.rows.length,
+        tasks: result.rows.map(formatTask)
       }
     });
   } catch (error) {
@@ -59,7 +58,7 @@ const getAllTasks = (req, res) => {
 };
 
 // GET /api/tasks/:id
-const getTask = (req, res) => {
+const getTask = async (req, res) => {
   try {
     const taskId = Number(req.params.id);
 
@@ -70,12 +69,12 @@ const getTask = (req, res) => {
       });
     }
 
-    // Ownership enforced in the query itself
-    const task = db.prepare(
-      'SELECT * FROM tasks WHERE id = ? AND user_id = ?'
-    ).get(taskId, req.user.id);
+    const result = await db.query(
+      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
+      [taskId, req.user.id]
+    );
 
-    if (!task) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Task not found'
@@ -84,7 +83,7 @@ const getTask = (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { task: formatTask(task) }
+      data: { task: formatTask(result.rows[0]) }
     });
   } catch (error) {
     console.error('Get task error:', error.message);
@@ -93,7 +92,7 @@ const getTask = (req, res) => {
 };
 
 // PUT /api/tasks/:id
-const updateTask = (req, res) => {
+const updateTask = async (req, res) => {
   try {
     const taskId = Number(req.params.id);
 
@@ -104,34 +103,36 @@ const updateTask = (req, res) => {
       });
     }
 
-    const existingTask = db.prepare(
-      'SELECT * FROM tasks WHERE id = ? AND user_id = ?'
-    ).get(taskId, req.user.id);
+    const existing = await db.query(
+      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
+      [taskId, req.user.id]
+    );
 
-    if (!existingTask) {
+    if (existing.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Task not found'
       });
     }
 
+    const existingTask = existing.rows[0];
     const body = req.body;
     const title = body.title !== undefined ? body.title : existingTask.title;
     const description = body.description !== undefined ? body.description : existingTask.description;
-    const completed = body.completed !== undefined ? body.completed : Boolean(existingTask.completed);
+    const completed = body.completed !== undefined ? body.completed : existingTask.completed;
 
-    db.prepare(
+    const result = await db.query(
       `UPDATE tasks
-       SET title = ?, description = ?, completed = ?, updated_at = datetime('now')
-       WHERE id = ? AND user_id = ?`
-    ).run(title, description, completed ? 1 : 0, taskId, req.user.id);
-
-    const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+       SET title = $1, description = $2, completed = $3, updated_at = NOW()
+       WHERE id = $4 AND user_id = $5
+       RETURNING *`,
+      [title, description, completed, taskId, req.user.id]
+    );
 
     res.status(200).json({
       success: true,
       message: 'Task updated successfully',
-      data: { task: formatTask(updatedTask) }
+      data: { task: formatTask(result.rows[0]) }
     });
   } catch (error) {
     console.error('Update task error:', error.message);
@@ -140,7 +141,7 @@ const updateTask = (req, res) => {
 };
 
 // DELETE /api/tasks/:id
-const deleteTask = (req, res) => {
+const deleteTask = async (req, res) => {
   try {
     const taskId = Number(req.params.id);
 
@@ -151,11 +152,12 @@ const deleteTask = (req, res) => {
       });
     }
 
-    const result = db.prepare(
-      'DELETE FROM tasks WHERE id = ? AND user_id = ?'
-    ).run(taskId, req.user.id);
+    const result = await db.query(
+      'DELETE FROM tasks WHERE id = $1 AND user_id = $2',
+      [taskId, req.user.id]
+    );
 
-    if (result.changes === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
         message: 'Task not found'

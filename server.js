@@ -22,6 +22,8 @@ const taskRoutes = require('./routes/taskRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const db = require('./config/db');
+
 // ---- Basic security headers (no external dependency needed) ----
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');

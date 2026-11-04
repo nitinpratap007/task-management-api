@@ -1,48 +1,75 @@
 // ==========================================
-// DATABASE SETUP — SQLite Connection + Tables
-// Persistent file-based database using better-sqlite3
+// DATABASE SETUP — PostgreSQL Connection
+// Uses pg (node-postgres) for hosted PostgreSQL
 // ==========================================
 
-const path = require('path');
-const fs = require('fs');
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 
-// Database file path: configurable via DB_PATH env var, defaults to project_root/data/app.db
-// Making this configurable allows automated tests to use an isolated database.
-const dbPath = process.env.DB_PATH
-  ? path.resolve(process.env.DB_PATH)
-  : path.join(__dirname, '..', 'data', 'app.db');
+// Connection string from environment variable
+const connectionString = process.env.DATABASE_URL;
 
-// Ensure the data folder exists
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+if (!connectionString) {
+  console.error('Missing DATABASE_URL environment variable');
+  process.exit(1);
+}
 
-// Open (or create) the database file
-const db = new Database(dbPath);
+// Create connection pool
+const pool = new Pool({
+  connectionString: connectionString,
+  ssl: { rejectUnauthorized: false }, // Required for Neon/Render/Railway
+});
 
-// Enable foreign key constraints (off by default in SQLite)
-db.pragma('foreign_keys = ON');
+// Test connection
+pool.on('connect', () => {
+  console.log('✅ Connected to PostgreSQL database');
+});
 
-// Create tables if they do not already exist.
-// Data survives server restarts; we never DROP or reset on startup.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    name          TEXT    NOT NULL,
-    email         TEXT    NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT    NOT NULL,
-    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
-  );
+pool.on('error', (err) => {
+  console.error('❌ PostgreSQL pool error:', err.message);
+});
 
-  CREATE TABLE IF NOT EXISTS tasks (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     INTEGER NOT NULL,
-    title       TEXT    NOT NULL,
-    description TEXT    NOT NULL DEFAULT '',
-    completed   INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-`);
+// Initialize database tables
+async function initDatabase() {
+  try {
+    // Create users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
 
-module.exports = db;
+    // Create tasks table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        completed BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    console.log('✅ Database tables initialized');
+  } catch (error) {
+    console.error('❌ Database initialization error:', error.message);
+    throw error;
+  }
+}
+
+// Initialize on startup
+initDatabase().catch((err) => {
+  console.error('Failed to initialize database:', err.message);
+  process.exit(1);
+});
+
+// Export pool and a query helper
+module.exports = {
+  pool,
+  query: (text, params) => pool.query(text, params),
+};
