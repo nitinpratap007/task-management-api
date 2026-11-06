@@ -1,0 +1,12 @@
+node_modules
+.env
+data
+*.db
+npm-debug.log
+.git
+.postman
+postman
+test
+WA-3_REACT_FRONTEND_ZERO_TO_HERO_GUIDE.md
+WA-3_REQUIREMENTS_CHECKLIST.md
+WA-4_AUDIT_REPORT.md
