@@ -1,6 +1,6 @@
-# Task Management REST API
+# Task Management REST API — WA-5 Authentication System
 
-A complete, functional REST API for personal task management with JWT authentication, built with Node.js, Express, and PostgreSQL.
+A complete, functional REST API for personal task management with JWT authentication, email verification, and password reset, built with Node.js, Express, and PostgreSQL.
 
 ## Tech Stack
 
@@ -10,27 +10,38 @@ A complete, functional REST API for personal task management with JWT authentica
 - **Authentication:** JWT (`jsonwebtoken`)
 - **Password Hashing:** `bcryptjs`
 - **Input Validation:** `express-validator`
+- **Email:** `nodemailer`
 - **Environment:** `dotenv`
 
 ## Features
 
+### WA-2 (Original)
 - User registration and login with JWT authentication
 - Passwords hashed with bcrypt (never stored or returned as plaintext)
 - Full CRUD operations for tasks
 - Protected routes require a valid `Authorization: Bearer <token>` header
-- Per-user task ownership — users can only access their own tasks
+- Per-user task ownership
 - Input validation with clear error messages
-- Consistent HTTP status codes (200, 201, 400, 401, 404, 409, 500)
-- Persistent PostgreSQL database (survives server restarts)
-- Centralized error handling and 404 handling
-- Configurable CORS
-- Security headers
+- Consistent HTTP status codes
+- Persistent PostgreSQL database
+- Centralized error handling
+
+### WA-5 (New)
+- **Email verification on registration** — account starts unverified
+- **Unverified users cannot log in** — must verify email first
+- **Forgot password** — sends reset link via email
+- **Reset password** — validates reset token, updates password
+- **Secure token handling** — SHA-256 hashed tokens, single-use, expiry
+- **Protected `/me` route** — returns authenticated user info
+- **Resend verification** — with generic response (no account enumeration)
+- **Generic error messages** — login/forgot-password don't reveal account existence
 
 ## Prerequisites
 
-- Node.js (v18 or higher recommended)
+- Node.js (v18 or higher)
 - npm
-- PostgreSQL database (local or hosted, e.g., Neon, Supabase, Railway, Render)
+- PostgreSQL database (local or hosted)
+- SMTP email service (Mailtrap for local testing)
 
 ## Installation
 
@@ -38,12 +49,11 @@ A complete, functional REST API for personal task management with JWT authentica
 # 1. Install dependencies
 npm install
 
-# 2. Create .env from the example template
+# 2. Create .env from template
 copy .env.example .env   (Windows)
-# or
-cp .env.example .env     (macOS/Linux)
+# cp .env.example .env   (macOS/Linux)
 
-# 3. Edit .env and set DATABASE_URL and JWT_SECRET
+# 3. Edit .env with your values
 ```
 
 ## Environment Setup
@@ -55,15 +65,33 @@ PORT=3000
 JWT_SECRET=your_random_secret_minimum_32_characters
 JWT_EXPIRES_IN=24h
 DATABASE_URL=postgresql://username:password@host/dbname?sslmode=require
-# Optional: comma-separated list of allowed CORS origins
+
+# Email (use Mailtrap for local testing: https://mailtrap.io)
+EMAIL_HOST=smtp.mailtrap.io
+EMAIL_PORT=2525
+EMAIL_SECURE=false
+EMAIL_USER=your_mailtrap_username
+EMAIL_PASS=your_mailtrap_password
+EMAIL_FROM=noreply@taskmanagement.com
+APP_BASE_URL=http://localhost:3000
+
+# Optional
 # ALLOWED_ORIGINS=http://localhost:5173
 ```
 
-- `PORT` — port the server listens on (default 3000)
-- `JWT_SECRET` — secret key for JWT tokens. **Never share this.**
-- `JWT_EXPIRES_IN` — token expiration (e.g. `24h`)
-- `DATABASE_URL` — PostgreSQL connection string
-- `ALLOWED_ORIGINS` — comma-separated CORS origins (optional in dev)
+## Database Setup
+
+Tables are created automatically on first startup. Migration adds auth columns.
+
+### Manual Migration (if needed)
+```sql
+-- Run in your PostgreSQL database
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expiry TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry TIMESTAMPTZ;
+```
 
 ## How to Start
 
@@ -75,36 +103,48 @@ npm start
 npm run dev
 ```
 
-The server runs at `http://localhost:3000`.
+Server runs at `http://localhost:3000`.
 
-## Database Setup
+## Email Setup (Mailtrap)
 
-The database tables are created automatically on first startup. No manual migration needed.
-
-Tables:
-- `users` (id, name, email, password_hash, created_at)
-- `tasks` (id, user_id, title, description, completed, created_at, updated_at)
+1. Go to https://mailtrap.io → Sign up (free)
+2. Create an inbox
+3. Copy SMTP credentials
+4. Set in `.env`:
+   - `EMAIL_HOST=smtp.mailtrap.io`
+   - `EMAIL_PORT=2525`
+   - `EMAIL_USER=your_username`
+   - `EMAIL_PASS=your_password`
+5. Test: Register a user → check Mailtrap inbox for verification email
 
 ## API Endpoints
-
-All task endpoints require header: `Authorization: Bearer <token>`
 
 ### Auth (Public)
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| POST | `/api/auth/register` | Register a new user | No |
-| POST | `/api/auth/login` | Log in and receive a JWT | No |
+| POST | `/api/auth/register` | Register (unverified) | No |
+| POST | `/api/auth/login` | Login (verified only) | No |
+| GET/POST | `/api/auth/verify-email` | Verify email token | No |
+| POST | `/api/auth/resend-verification` | Resend verification | No |
+| POST | `/api/auth/forgot-password` | Request reset link | No |
+| POST | `/api/auth/reset-password` | Reset password | No |
+
+### Auth (Protected)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/auth/me` | Get current user | Bearer |
 
 ### Tasks (Protected)
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
 | POST | `/api/tasks` | Create a task | Yes |
-| GET | `/api/tasks` | List the authenticated user's tasks | Yes |
-| GET | `/api/tasks/:id` | Retrieve a single task | Yes |
-| PUT | `/api/tasks/:id` | Update a task | Yes |
-| DELETE | `/api/tasks/:id` | Delete a task | Yes |
+| GET | `/api/tasks` | List user's tasks | Yes |
+| GET | `/api/tasks/:id` | Get single task | Yes |
+| PUT | `/api/tasks/:id` | Update task | Yes |
+| DELETE | `/api/tasks/:id` | Delete task | Yes |
 
 ### Health
 
@@ -112,89 +152,82 @@ All task endpoints require header: `Authorization: Bearer <token>`
 |--------|----------|-------------|------|
 | GET | `/api/health` | Health check | No |
 
-## Example Requests & Responses
+## Authentication Flow
 
-### Register
-```http
+### 1. Registration
+```
 POST /api/auth/register
-Content-Type: application/json
-
-{
-  "name": "Nitin Pratap",
-  "email": "nitin@example.com",
-  "password": "MyPassword123"
-}
-```
-Response (201):
-```json
-{
-  "success": true,
-  "message": "User registered successfully",
-  "data": {
-    "user": { "id": 1, "name": "Nitin Pratap", "email": "nitin@example.com" },
-    "token": "eyJhbGciOi..."
-  }
-}
+{ "name": "John", "email": "john@test.com", "password": "TestPass123" }
+→ 201: Account created (unverified), verification email sent
 ```
 
-### Login
-```http
+### 2. Email Verification
+```
+GET /api/auth/verify-email?token=<raw-token-from-email>
+→ 200: Email verified successfully
+```
+
+### 3. Login (after verification)
+```
 POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "nitin@example.com",
-  "password": "MyPassword123"
-}
+{ "email": "john@test.com", "password": "TestPass123" }
+→ 200: JWT token returned
 ```
-Response (200): returns `token` and user info (no password hash).
 
-### Create Task
-```http
-POST /api/tasks
-Content-Type: application/json
-Authorization: Bearer <token>
-
-{
-  "title": "Complete REST API",
-  "description": "Build WA-2 project",
-  "completed": false
-}
+### 4. Login (before verification)
 ```
-Response (201): created task object.
-
-### Get All Tasks
-```http
-GET /api/tasks
-Authorization: Bearer <token>
+POST /api/auth/login
+→ 403: Please verify your email before logging in
 ```
-Response (200): `{ "count": N, "tasks": [ ... ] }`
 
-### Get Single Task
-```http
-GET /api/tasks/1
-Authorization: Bearer <token>
+### 5. Forgot Password
 ```
-Response (200): single task object. (404 if not found or not owned by user.)
-
-### Update Task
-```http
-PUT /api/tasks/1
-Content-Type: application/json
-Authorization: Bearer <token>
-
-{
-  "completed": true
-}
+POST /api/auth/forgot-password
+{ "email": "john@test.com" }
+→ 200: Generic response (doesn't reveal if email exists)
 ```
-Response (200): updated task object.
 
-### Delete Task
-```http
-DELETE /api/tasks/1
-Authorization: Bearer <token>
+### 6. Reset Password
 ```
-Response (200): `{ "success": true, "message": "Task deleted successfully" }`.
+POST /api/auth/reset-password
+{ "token": "<raw-token-from-email>", "newPassword": "NewPass123!" }
+→ 200: Password reset successfully
+```
+
+### 7. Protected Route
+```
+GET /api/auth/me
+Authorization: Bearer <jwt-token>
+→ 200: User info (no password hash)
+```
+
+## Security Notes
+
+- Passwords hashed with bcrypt (12 salt rounds)
+- Verification/reset tokens stored as SHA-256 hashes (raw token only in email)
+- Tokens are single-use (cleared after use)
+- Token expiry: verification 24h, reset 1h
+- JWT expiry: 24h (configurable)
+- Generic error messages for login/forgot-password (no account enumeration)
+- No secrets in source code
+- No raw tokens in API responses or logs
+
+## Known Limitations
+
+- Email delivery requires SMTP configuration (Mailtrap for local testing)
+- No rate limiting on auth endpoints
+- No refresh token mechanism
+- No email verification for existing (legacy) users
+- No account lockout after failed attempts
+
+## Future Improvements
+
+- Add rate limiting (express-rate-limit)
+- Add refresh token support
+- Add email verification for legacy users
+- Add account lockout
+- Add 2FA support
+- Add OAuth (Google, GitHub)
 
 ## Automated Tests
 
@@ -202,47 +235,18 @@ Response (200): `{ "success": true, "message": "Task deleted successfully" }`.
 npm test
 ```
 
-## Deploy to Render
+## Git Workflow
 
-### Step 1: Create Render Account
-1. Go to https://render.com
-2. Sign up (GitHub login recommended)
+```bash
+# Create feature branch
+git checkout -b wa-5-authentication
 
-### Step 2: Create Web Service
-1. Dashboard → **New** → **Web Service**
-2. Connect your GitHub repo: `task-management-api`
-3. Configure:
-   - **Name:** `task-management-api`
-   - **Environment:** `Node`
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-   - **Plan:** Free
+# Make changes
+git add .
+git commit -m "feat: add email verification and password reset"
 
-### Step 3: Set Environment Variables
-In Render dashboard → Environment:
-| Key | Value |
-|-----|-------|
-| `PORT` | `10000` (Render sets this automatically, but you can override) |
-| `JWT_SECRET` | Your strong secret (generate one) |
-| `JWT_EXPIRES_IN` | `24h` |
-| `DATABASE_URL` | Your Neon PostgreSQL connection string |
-| `ALLOWED_ORIGINS` | Your Vercel frontend URL (e.g., `https://your-app.vercel.app`) |
+# Push feature branch
+git push origin wa-5-authentication
+```
 
-### Step 4: Deploy
-Click **Create Web Service**. Render will build and deploy.
-
-Your backend URL will be: `https://task-management-api.onrender.com`
-
-### Step 5: Verify
-Open: `https://task-management-api.onrender.com/api/health`
-Expected: `{"status":"ok","timestamp":"..."}`
-
-## Security Limitations & Future Improvements
-
-- No rate limiting on auth endpoints
-- No refresh token mechanism
-- No email verification
-- No HTTPS configuration (handled by Render)
-- CORS configured via ALLOWED_ORIGINS env var
-
-Do not commit `.env`, `node_modules/`, or `data/` to Git.
+Do not merge to main without review.

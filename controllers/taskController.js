@@ -11,6 +11,8 @@ const formatTask = (task) => ({
   title: task.title,
   description: task.description,
   completed: task.completed === true,
+  dueDate: task.due_date,
+  reminderSent: task.reminder_sent,
   createdAt: task.created_at,
   updatedAt: task.updated_at
 });
@@ -18,11 +20,11 @@ const formatTask = (task) => ({
 // POST /api/tasks
 const createTask = async (req, res) => {
   try {
-    const { title, description = '', completed = false } = req.body;
+    const { title, description = '', completed = false, dueDate = null } = req.body;
 
     const result = await db.query(
-      'INSERT INTO tasks (user_id, title, description, completed) VALUES ($1, $2, $3, $4) RETURNING *',
-      [req.user.id, title, description, completed]
+      'INSERT INTO tasks (user_id, title, description, completed, due_date) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.user.id, title, description, completed, dueDate]
     );
 
     res.status(201).json({
@@ -120,13 +122,19 @@ const updateTask = async (req, res) => {
     const title = body.title !== undefined ? body.title : existingTask.title;
     const description = body.description !== undefined ? body.description : existingTask.description;
     const completed = body.completed !== undefined ? body.completed : existingTask.completed;
+    const dueDate = body.dueDate !== undefined ? body.dueDate : existingTask.due_date;
+
+    // Reset reminder_sent if due date changed
+    const resetReminder = body.dueDate !== undefined && body.dueDate !== existingTask.due_date;
 
     const result = await db.query(
       `UPDATE tasks
-       SET title = $1, description = $2, completed = $3, updated_at = NOW()
-       WHERE id = $4 AND user_id = $5
+       SET title = $1, description = $2, completed = $3, due_date = $4,
+           reminder_sent = CASE WHEN $5 THEN FALSE ELSE reminder_sent END,
+           updated_at = NOW()
+       WHERE id = $6 AND user_id = $7
        RETURNING *`,
-      [title, description, completed, taskId, req.user.id]
+      [title, description, completed, dueDate, resetReminder, taskId, req.user.id]
     );
 
     res.status(200).json({

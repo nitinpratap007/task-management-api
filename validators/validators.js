@@ -64,7 +64,11 @@ const createTaskRules = [
 
   body('completed')
     .optional()
-    .isBoolean().withMessage('Completed must be true or false')
+    .isBoolean().withMessage('Completed must be true or false'),
+
+  body('dueDate')
+    .optional({ nullable: true })
+    .isISO8601().withMessage('Due date must be a valid ISO date')
 ];
 
 // Update task rules (all fields optional)
@@ -82,7 +86,47 @@ const updateTaskRules = [
 
   body('completed')
     .optional()
-    .isBoolean().withMessage('Completed must be true or false')
+    .isBoolean().withMessage('Completed must be true or false'),
+
+  body('dueDate')
+    .optional({ nullable: true })
+    .isISO8601().withMessage('Due date must be a valid ISO date')
+];
+
+// Verify email rules (token can come from query or body)
+const verifyEmailRules = [
+  body('token')
+    .optional()
+    .trim()
+    .notEmpty().withMessage('Verification token is required'),
+];
+
+// Forgot password rules
+const forgotPasswordRules = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Valid email is required')
+];
+
+// Reset password rules
+const resetPasswordRules = [
+  body('token')
+    .trim()
+    .notEmpty().withMessage('Reset token is required'),
+
+  body('newPassword')
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .isLength({ max: 72 }).withMessage('Password must be under 72 characters')
+];
+
+// Resend verification rules
+const resendVerificationRules = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Valid email is required')
 ];
 
 module.exports = {
@@ -90,5 +134,9 @@ module.exports = {
   registerRules,
   loginRules,
   createTaskRules,
-  updateTaskRules
+  updateTaskRules,
+  verifyEmailRules,
+  forgotPasswordRules,
+  resetPasswordRules,
+  resendVerificationRules
 };

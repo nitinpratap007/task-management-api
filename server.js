@@ -18,6 +18,7 @@ if (missing.length > 0) {
 
 const authRoutes = require('./routes/authRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const { startReminderScheduler } = require('./services/reminderScheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -120,4 +121,6 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`✅ Server is running at http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
+  // Start reminder scheduler
+  startReminderScheduler();
 });
