@@ -1,37 +1,50 @@
 // ==========================================
 // DATABASE SETUP — PostgreSQL Connection
 // Uses pg (node-postgres) for hosted PostgreSQL
+// In test mode (NODE_ENV=test) uses an in-memory pg-mem database.
 // ==========================================
 
-const { Pool } = require('pg');
+const isTest = process.env.NODE_ENV === 'test';
 
-// Connection string from environment variable
-const connectionString = process.env.DATABASE_URL;
+let pool;
 
-if (!connectionString) {
-  console.error('Missing DATABASE_URL environment variable');
-  process.exit(1);
+if (isTest) {
+  // SAFETY: never use the production DATABASE_URL in tests.
+  if (process.env.DATABASE_URL) {
+    const url = process.env.DATABASE_URL;
+    if (/neon\.tech/i.test(url) || /ep-.*-pooler/i.test(url)) {
+      throw new Error('SAFETY: Refusing to use production DATABASE_URL in test mode.');
+    }
+  }
+  const { newDb } = require('pg-mem');
+  const memDb = newDb();
+  const adapter = memDb.adapters.createPg();
+  pool = new adapter.Pool();
+} else {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('Missing DATABASE_URL environment variable');
+  }
+  const { Pool } = require('pg');
+  pool = new Pool({
+    connectionString: connectionString,
+    ssl: { rejectUnauthorized: false }, // Required for Neon/Render/Railway
+  });
 }
 
-// Create connection pool
-const pool = new Pool({
-  connectionString: connectionString,
-  ssl: { rejectUnauthorized: false }, // Required for Neon/Render/Railway
-});
-
-// Test connection
-pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL database');
-});
-
-pool.on('error', (err) => {
-  console.error('❌ PostgreSQL pool error:', err.message);
-});
+// Test connection (real DB only; pg-mem pool also supports events)
+if (pool && typeof pool.on === 'function') {
+  pool.on('connect', () => {
+    if (!isTest) console.log('✅ Connected to PostgreSQL database');
+  });
+  pool.on('error', (err) => {
+    console.error('❌ PostgreSQL pool error:', err.message);
+  });
+}
 
 // Initialize database tables
 async function initDatabase() {
   try {
-    // Create users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -42,7 +55,6 @@ async function initDatabase() {
       );
     `);
 
-    // Create tasks table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
@@ -55,32 +67,26 @@ async function initDatabase() {
       );
     `);
 
-    // Migration: Add authentication columns to users table
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_hash TEXT;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expiry TIMESTAMPTZ;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash TEXT;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry TIMESTAMPTZ;`);
 
-    // Migration: Add reminder fields to tasks table
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN NOT NULL DEFAULT FALSE;`);
 
-    console.log('✅ Database tables initialized');
+    if (!isTest) console.log('✅ Database tables initialized');
   } catch (error) {
     console.error('❌ Database initialization error:', error.message);
     throw error;
   }
 }
 
-// Initialize on startup
-initDatabase().catch((err) => {
-  console.error('Failed to initialize database:', err.message);
-  process.exit(1);
-});
-
 // Export pool and a query helper
 module.exports = {
   pool,
   query: (text, params) => pool.query(text, params),
+  initDatabase,
+  isTest,
 };

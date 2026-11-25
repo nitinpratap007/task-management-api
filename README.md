@@ -229,11 +229,57 @@ Authorization: Bearer <jwt-token>
 - Add 2FA support
 - Add OAuth (Google, GitHub)
 
-## Automated Tests
+## Automated Tests (WA-7)
 
+### Testing Stack
+- **Jest** — test runner, assertions, coverage
+- **Supertest** — HTTP integration testing against the Express app
+- **pg-mem** — in-memory PostgreSQL for isolated, repeatable tests
+
+### Environment Configuration
+Tests never use the production database. `NODE_ENV=test` is set automatically by Jest setup.
+
+1. Test env file: `.env.test` (committed, test-only values, no secrets).
+2. In-memory database: `pg-mem` (no external Postgres needed for tests).
+3. Email delivery is mocked in integration tests; raw tokens are captured privately.
+
+### Running Tests
 ```bash
 npm test
 ```
+Runs the Jest suite. Returns non-zero exit code on failure.
+
+### Running Coverage
+```bash
+npm run test:coverage
+```
+Generates a coverage report. HTML report: `coverage/lcov-report/index.html`.
+
+### Watch Mode
+```bash
+npm run test:watch
+```
+
+### Test Architecture
+- `tests/setupEnv.js` — sets `NODE_ENV=test`, loads `.env.test`, safety guards.
+- `tests/setupDb.js` — initializes in-memory schema, closes pool.
+- `tests/unit/` — unit tests for `tokenUtils`, validators, email service, auth middleware, reminder scheduler, app CORS, db safety.
+- `tests/integration/` — Supertest tests for health, auth, and tasks endpoints.
+- `tests/helpers/emailMock.js` — test-only email mock capturing verification/reset tokens.
+
+### Database Isolation
+- Tests use an in-memory `pg-mem` database; production Neon `DATABASE_URL` is never used.
+- A safety guard throws if a production Neon URL is detected in test mode.
+- Each test file uses a fresh in-memory database.
+
+### Mocking External Services
+- Email sending is mocked (`tests/helpers/emailMock.js`); no real emails are sent.
+- Verification/reset tokens are captured in-memory for assertions only.
+
+### Troubleshooting
+- **"SAFETY: Production DATABASE_URL detected"**: Remove `DATABASE_URL` from `.env.test` or environment.
+- **Missing JWT_SECRET**: Ensure `.env.test` exists with `JWT_SECRET`.
+- **Legacy tests**: `test/api.test.js` is outdated (SQLite-based) and is not run by `npm test`.
 
 ## Git Workflow
 

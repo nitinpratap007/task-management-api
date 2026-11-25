@@ -136,7 +136,7 @@ const login = async (req, res) => {
 const verifyEmail = async (req, res) => {
   try {
     // Accept token from query params or request body
-    const token = req.query.token || req.body.token;
+    const token = req.query.token || (req.body && req.body.token);
 
     if (!token) {
       return res.status(400).json({

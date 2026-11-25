@@ -4,3 +4,6 @@ data/
 *.db
 npm-debug.log
 .DS_Store
+
+coverage/
+coverage_out*.txt
