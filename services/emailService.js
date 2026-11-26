@@ -5,6 +5,14 @@
 
 const nodemailer = require('nodemailer');
 
+// Send with a hard timeout so a misconfigured SMTP server can't hang requests
+const sendMailWithTimeout = (transporter, mailOptions, ms = 15000) => {
+  return Promise.race([
+    transporter.sendMail(mailOptions),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Email send timed out')), ms))
+  ]);
+};
+
 // Create transporter from env config
 const createTransporter = () => {
   const host = process.env.EMAIL_HOST;
@@ -24,7 +32,10 @@ const createTransporter = () => {
     auth: {
       user,
       pass
-    }
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000
   });
 };
 
@@ -54,7 +65,7 @@ const sendVerificationEmail = async (email, name, rawToken) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMailWithTimeout(transporter, mailOptions);
     return true;
   } catch (error) {
     console.error('Failed to send verification email:', error.message);
@@ -89,7 +100,7 @@ const sendPasswordResetEmail = async (email, name, rawToken) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMailWithTimeout(transporter, mailOptions);
     return true;
   } catch (error) {
     console.error('Failed to send reset email:', error.message);
@@ -129,7 +140,7 @@ const sendTaskReminderEmail = async (email, name, taskTitle, taskDescription, du
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMailWithTimeout(transporter, mailOptions);
     return true;
   } catch (error) {
     console.error('Failed to send reminder email:', error.message);
