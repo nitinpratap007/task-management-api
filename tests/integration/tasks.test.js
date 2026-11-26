@@ -10,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 async function clearDb() {
   await db.query('DELETE FROM tasks');
+  await db.query('DELETE FROM categories');
   await db.query('DELETE FROM users');
 }
 

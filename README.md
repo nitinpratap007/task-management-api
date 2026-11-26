@@ -93,6 +93,23 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry TIMESTAMPTZ;
 ```
 
+## Database Schema (WA-C2)
+
+Three related tables with enforced foreign keys:
+
+- **users** — account identity; unique normalized email; bcrypt password hash; timestamps; verification/reset token hashes.
+- **categories** — user-owned grouping; FK `user_id → users(id) ON DELETE CASCADE`; unique `(user_id, name)`.
+- **tasks** — user-owned task; FK `user_id → users(id) ON DELETE CASCADE`; optional FK `category_id → categories(id) ON DELETE SET NULL`.
+
+```mermaid
+erDiagram
+    USERS ||--o{ CATEGORIES : owns
+    USERS ||--o{ TASKS : owns
+    CATEGORIES ||--o{ TASKS : groups
+```
+
+Indexes: `idx_categories_user_id`, `idx_tasks_user_id`, `idx_tasks_category_id`, plus PK/UNIQUE indexes.
+
 ## How to Start
 
 ```bash
@@ -145,6 +162,16 @@ Server runs at `http://localhost:3000`.
 | GET | `/api/tasks/:id` | Get single task | Yes |
 | PUT | `/api/tasks/:id` | Update task | Yes |
 | DELETE | `/api/tasks/:id` | Delete task | Yes |
+
+### Categories (Protected)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/categories` | Create a category | Yes |
+| GET | `/api/categories` | List user's categories | Yes |
+| GET | `/api/categories/:id` | Get single category | Yes |
+| PUT | `/api/categories/:id` | Update category | Yes |
+| DELETE | `/api/categories/:id` | Delete category (tasks uncategorized) | Yes |
 
 ### Health
 

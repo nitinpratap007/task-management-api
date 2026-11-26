@@ -68,7 +68,11 @@ const createTaskRules = [
 
   body('dueDate')
     .optional({ nullable: true })
-    .isISO8601().withMessage('Due date must be a valid ISO date')
+    .isISO8601().withMessage('Due date must be a valid ISO date'),
+
+  body('categoryId')
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('Category ID must be a positive integer')
 ];
 
 // Update task rules (all fields optional)
@@ -90,7 +94,11 @@ const updateTaskRules = [
 
   body('dueDate')
     .optional({ nullable: true })
-    .isISO8601().withMessage('Due date must be a valid ISO date')
+    .isISO8601().withMessage('Due date must be a valid ISO date'),
+
+  body('categoryId')
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('Category ID must be a positive integer')
 ];
 
 // Verify email rules (token can come from query or body)
@@ -129,12 +137,31 @@ const resendVerificationRules = [
     .isEmail().withMessage('Valid email is required')
 ];
 
+// Create category rules
+const createCategoryRules = [
+  body('name')
+    .trim()
+    .notEmpty().withMessage('Name is required')
+    .isLength({ max: 100 }).withMessage('Name must be under 100 characters')
+];
+
+// Update category rules (all optional)
+const updateCategoryRules = [
+  body('name')
+    .optional()
+    .trim()
+    .notEmpty().withMessage('Name cannot be empty if provided')
+    .isLength({ max: 100 }).withMessage('Name must be under 100 characters')
+];
+
 module.exports = {
   validate,
   registerRules,
   loginRules,
   createTaskRules,
   updateTaskRules,
+  createCategoryRules,
+  updateCategoryRules,
   verifyEmailRules,
   forgotPasswordRules,
   resetPasswordRules,

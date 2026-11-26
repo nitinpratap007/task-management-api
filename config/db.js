@@ -67,6 +67,21 @@ async function initDatabase() {
       );
     `);
 
+    // Third related table: categories (user-owned grouping for tasks)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT categories_user_name_unique UNIQUE (user_id, name)
+      );
+    `);
+
+    // Link tasks to categories (nullable; SET NULL when category deleted)
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;`);
+
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_hash TEXT;`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expiry TIMESTAMPTZ;`);
@@ -75,6 +90,11 @@ async function initDatabase() {
 
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN NOT NULL DEFAULT FALSE;`);
+
+    // Indexes for FK and frequent lookup columns
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_category_id ON tasks(category_id);`);
 
     if (!isTest) console.log('✅ Database tables initialized');
   } catch (error) {
